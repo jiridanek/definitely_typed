@@ -1,4 +1,4 @@
-import '../packages/unittest/unittest.dart';
+import 'package:unittest/unittest.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
@@ -98,6 +98,10 @@ main() {
       var i = new Token(TokenType.IDENTIFIER, 'myIdentifier');
       lexString(': myIdentifier', [c, i]);
     });
+    test('multiple lines of input', () {
+      var t = new Token(TokenType.CHAR, ';');
+      lexString(';\n;', [t, t]);
+    });
   });
 
   group('lexStuff', () {
@@ -111,11 +115,24 @@ main() {
             'string'), // FIXME: or should I consider it a KEYWORD?
       ]);
     });
+    test('name status', () {
+      lexString('declare var name;\ndeclare var status;', [
+        new Token(TokenType.KEYWORD, 'declare'),
+        new Token(TokenType.KEYWORD, 'var'),
+        new Token(TokenType.IDENTIFIER, 'name'),
+        new Token(TokenType.CHAR, ';'),
+        new Token(TokenType.KEYWORD, 'declare'),
+        new Token(TokenType.KEYWORD, 'var'),
+        new Token(TokenType.IDENTIFIER, 'status'),
+        new Token(TokenType.CHAR, ';'),
+      ]);
+    });
   });
 
   group('parser', () {
     test('parseStuff', () {
       expectParsedString('declare var name;', '<declare <var name>>');
+      expectParsedString('declare var name;\ndeclare var status;', '<declare <var name>><declare <var status>>');
       expectParsedString(
           'declare var name: string;', '<declare <var name: <type string>>>');
       parseString('declare var name: (string);');
@@ -123,21 +140,33 @@ main() {
     });
     test('generateStuff', () {
       expectCodeString('declare var name;', '@Js()external get name;\n');
+      //expectCodeString('declare var name;\ndeclare var status;', '@Js()external get name;\n@Js()external get status;\n');
       expectCodeString(
           'declare var name: string;', '@Js()external String get name;\n');
+    });
+  });
+
+  group('generate from dom.d.ts', () {
+    test('', () {
+      var code = generateCodeFromFile('example/dom.d.ts');
+      expect(code, '@Js()external String get name;\n@Js()external String get status;\n');
     });
   });
 }
 
 expectParsedString(s, e) {
   var treePrinter = new TreePrinterVisitor();
-  parseString(s).accept(treePrinter);
+  for (var node in parseString(s)) {
+    node.accept(treePrinter);
+  }
   expect(treePrinter.w.toString(), e);
 }
 
 expectCodeString(s, e) {
   var codeGenerator = new CodeGeneratingVisitor();
-  parseString(s).accept(codeGenerator);
+  for (var node in parseString(s)) {
+    node.accept(codeGenerator);
+  }
   expect(codeGenerator.w.toString(), e);
 }
 
@@ -147,6 +176,22 @@ parseString(s) {
   var p = new Parser();
   var ast = p.parse(tokens);
   return ast;
+}
+
+String generateCodeFromFile(String path) {
+  var path = '../example/dom.d.ts';
+      var f = new File(path);
+      var s = f.readAsLinesSync(encoding: UTF8);
+      var ss = new Stream<String>.fromIterable(s);
+      var l = new Lexer(ss);
+      var ls = l.lex(s.join(' '));
+      var p = new Parser();
+      var ps = p.parse(ls);
+      var v = new CodeGeneratingVisitor();
+      for (var n in ps) {
+        n.accept(v);
+      }
+  return v.w.toString();
 }
 
 enum TokenType { EOF, CHAR, IDENTIFIER, KEYWORD }
@@ -161,7 +206,7 @@ class Token {
     return type == o.type && value == o.value;
   }
 
-  //@Override
+  @override
   String toString() {
     switch (type) {
       case TokenType.EOF:
@@ -209,7 +254,7 @@ class Lexer {
   }
 
   consumeWhitespace(String s) {
-    while (pos < s.length && s[pos].matchAsPrefix(' ') != null) {
+    while (pos < s.length && (s[pos].matchAsPrefix(' ') != null || s[pos].matchAsPrefix('\n') != null)) {
       pos++;
     }
   }
@@ -299,9 +344,15 @@ class Parser {
   int pos = 0;
   List<Token> tokens;
 
-  parse(List<Token> tokens) {
+  List<Node> parse(List<Token> tokens) {
     this.tokens = tokens;
-    return _AmbientDeclaration();
+
+    List<Node> nodes = [];
+    for (var t = peek(); t.type != TokenType.EOF; t = peek()) {
+      nodes.add(_AmbientDeclaration());
+    }
+    consume();
+    return nodes;
   }
 
   //****
