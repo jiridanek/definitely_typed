@@ -5,15 +5,15 @@ import 'dart:convert';
 
 class Lexemes {
   // https://github.com/Microsoft/TypeScript/issues/2536
-  static final chars = '<>()[]{}|&?:;,.'.split('');
+  static final chars = '<>()[]{}=|&?:;,.'.split('');
   static final operators = '=> ...'.split(' ');
 
   //TODO: not complete
-  // extends new private public protected function interface
+
   // contextual keywords: any number boolean string symbol void //TODO: not complete // lets treat them as identifiers for now
-  static final keywords =
-      'declare var let const function class constructor static namespace export module'
-          .split(' '); //section A.11
+  static final keywords = 'extends new private public protected function interface '
+      'declare var let const function class constructor static namespace export module' //section A.11
+      .split(' ');
 }
 
 lexString(String s, List<Token> ts) {
@@ -21,7 +21,7 @@ lexString(String s, List<Token> ts) {
   var l = new Lexer(stream);
   var k = l.lex(s);
   var eof = new Token(TokenType.EOF, '');
-  if (ts.last != eof) {
+  if (ts.isEmpty || ts.last != eof) {
     ts.add(eof);
   }
   expect(k, ts);
@@ -63,9 +63,21 @@ main() {
     test('eof', () {
       lexString('', [new Token(TokenType.EOF, '')]);
     });
+
+    test('lineComment', () {
+      lexString('//', []);
+    });
+    test('block comment', () {
+      lexString('/**block\ncomment*/', []);
+    });
+
     test('whitespace', () {
       lexString(' ', [new Token(TokenType.EOF, '')]);
     });
+    test('char whitespace', () {
+      lexString('; ', [new Token(TokenType.CHAR, ';')]);
+    });
+
     test('chars', () {
       for (var char in Lexemes.chars) {
         lexString(char, [new Token(TokenType.CHAR, char)]);
@@ -79,6 +91,20 @@ main() {
     test('identifiers', () {
       var identifier = 'myIdentifier';
       lexString(identifier, [new Token(TokenType.IDENTIFIER, identifier)]);
+
+      var validIdentifiers = 'a aa A AA a_a a1'.split(' ');
+      for (var identifier in validIdentifiers) {
+        lexString(identifier, [new Token(TokenType.IDENTIFIER, identifier)]);
+      }
+    });
+    test('operators', () {
+      for (var operator in Lexemes.operators) {
+        lexString(operator, [new Token(TokenType.OPERATOR, operator)]);
+      }
+    });
+    // let's strip quotes for now; ivy keeps them, wonder why
+    test('string literals', () {
+      lexString('"a string"', [new Token(TokenType.STRING, 'a string')]);
     });
 
     test('twoChars', () {
@@ -132,7 +158,8 @@ main() {
   group('parser', () {
     test('parseStuff', () {
       expectParsedString('declare var name;', '<declare <var name>>');
-      expectParsedString('declare var name;\ndeclare var status;', '<declare <var name>><declare <var status>>');
+      expectParsedString('declare var name;\ndeclare var status;',
+          '<declare <var name>><declare <var status>>');
       expectParsedString(
           'declare var name: string;', '<declare <var name: <type string>>>');
       parseString('declare var name: (string);');
@@ -146,10 +173,17 @@ main() {
     });
   });
 
-  group('generate from dom.d.ts', () {
-    test('', () {
-      var code = generateCodeFromFile('example/dom.d.ts');
-      expect(code, '@Js()external String get name;\n@Js()external String get status;\n');
+  group('from dom.d.ts', () {
+    test('can lex n lines', () {
+      var n = -1;
+      var tokens = lexFromFile('dom.generated.d.ts_de52865', n);
+      //print(tokens);
+    });
+    test('can put first n lines through the whole process', () {
+      var n = 5;
+      var code = generateCodeFromFile('dom.generated.d.ts_de52865', n);
+      print(code);
+      //expect(code, '@Js()external String get name;\n@Js()external String get status;\n');
     });
   });
 }
@@ -160,6 +194,18 @@ expectParsedString(s, e) {
     node.accept(treePrinter);
   }
   expect(treePrinter.w.toString(), e);
+}
+
+List<Token> lexFromFile(String path, int nlines) {
+  var f = new File(path);
+  var s = f.readAsLinesSync();
+  if (nlines != -1) {
+    s = s.take(nlines);
+  }
+  var ss = new Stream.fromIterable(s);
+  var l = new Lexer(ss);
+  var ts = l.lex(s.join('\n'));
+  return ts;
 }
 
 expectCodeString(s, e) {
@@ -178,23 +224,18 @@ parseString(s) {
   return ast;
 }
 
-String generateCodeFromFile(String path) {
-  var path = '../example/dom.d.ts';
-      var f = new File(path);
-      var s = f.readAsLinesSync(encoding: UTF8);
-      var ss = new Stream<String>.fromIterable(s);
-      var l = new Lexer(ss);
-      var ls = l.lex(s.join(' '));
-      var p = new Parser();
-      var ps = p.parse(ls);
-      var v = new CodeGeneratingVisitor();
-      for (var n in ps) {
-        n.accept(v);
-      }
+String generateCodeFromFile(String path, [int nlines = -1]) {
+  var ls = lexFromFile(path, nlines);
+  var p = new Parser();
+  var ps = p.parse(ls);
+  var v = new CodeGeneratingVisitor();
+  for (var n in ps) {
+    n.accept(v);
+  }
   return v.w.toString();
 }
 
-enum TokenType { EOF, CHAR, IDENTIFIER, KEYWORD }
+enum TokenType { EOF, CHAR, IDENTIFIER, KEYWORD, OPERATOR, STRING }
 
 class Token {
   TokenType type;
@@ -220,12 +261,13 @@ class Token {
 class Lexer {
   Stream<String> input;
   int pos = 0;
+  var tokens = [];
 
   // current position in the input
   Lexer(this.input);
 
   List<Token> lex(String s) {
-    var tokens = [];
+    tokens = [];
 
     while (true) {
       consumeWhitespace(s);
@@ -234,12 +276,34 @@ class Lexer {
         tokens.add(new Token(TokenType.EOF, ''));
         return tokens;
       }
+      var operator = new RegExp('(${Lexemes.operators.map(escapeRegex).join(')|(')})').matchAsPrefix(s, pos);
+      if (operator != null) {
+        tokens.add(new Token(TokenType.OPERATOR, operator.group(0)));
+        pos += operator.group(0).length;
+        continue;
+      }
       if (Lexemes.chars.contains(s[pos])) {
         tokens.add(new Token(TokenType.CHAR, s[pos]));
         pos++;
         continue;
       }
-      var nextWord = new RegExp(r'[a-z][A-Za-z0-9]*').matchAsPrefix(s, pos);
+      if (s[pos] == '\"') {
+        lexStringConst(s);
+        continue;
+      }
+      var lineComment = new RegExp(r'//').matchAsPrefix(s, pos);
+      if (lineComment != null) {
+        pos += 2;
+        lexComment(s);
+        continue;
+      }
+      var blockComment = new RegExp(r'/\*').matchAsPrefix(s, pos);
+      if (blockComment != null) {
+        pos += 2;
+        lexBlockComment(s);
+        continue;
+      }
+      var nextWord = new RegExp(r'[A-Za-z_][A-Za-z0-9_]*').matchAsPrefix(s, pos);
       if (nextWord != null) {
         if (Lexemes.keywords.contains(nextWord.group(0))) {
           tokens.add(new Token(TokenType.KEYWORD, nextWord.group(0)));
@@ -249,15 +313,56 @@ class Lexer {
         pos += nextWord.group(0).length;
         continue;
       }
-      throw ('invalid char: ${s[pos]}');
+      throw ('invalid char: ${s[pos]} in "${s.substring(max(0, pos-15), min(pos+5, s.length))}"');
+    }
+  }
+
+  void lexBlockComment(String s) {
+    while(pos < s.length) {
+      if (s[pos] == '*') {
+        pos++;
+        if (pos < s.length && s[pos] == '/') {
+          pos++;
+          return;
+        }
+        continue;
+      }
+      pos++;
+    }
+  }
+
+  void lexComment(String s) {
+    while (pos < s.length && s[pos] != '\n') {
+      pos++;
     }
   }
 
   consumeWhitespace(String s) {
-    while (pos < s.length && (s[pos].matchAsPrefix(' ') != null || s[pos].matchAsPrefix('\n') != null)) {
+    while (pos < s.length &&
+        (s[pos].matchAsPrefix(' ') != null ||
+            s[pos].matchAsPrefix('\n') != null)) {
       pos++;
     }
   }
+
+  lexStringConst(String s) {
+    var p = pos;
+    var c = s[p];
+    pos++;
+    while (pos < s.length) {
+      if (s[pos] == c) {
+        tokens.add(new Token(TokenType.STRING, s.substring(p+1, pos)));
+        pos++;
+        return;
+      }
+      pos++;
+    }
+  }
+}
+
+String escapeRegex(String r) {
+  r = r.replaceAll('.', '\\.');
+  return r;
 }
 
 class ParsingError extends StateError {
@@ -270,6 +375,20 @@ abstract class Visitor {
   var w = new StringBuffer();
 
   void visit(Node node);
+}
+
+max(a, b) {
+  if (a <= b) {
+    return b;
+  }
+  return a;
+}
+
+min(a, b) {
+  if (a < b) {
+    return a;
+  }
+  return b;
 }
 
 class TreePrinterVisitor extends Visitor {
