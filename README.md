@@ -1,4 +1,4 @@
-# dts2dart
+# definitely_typed.dart
 
 ## Motivation
 
@@ -16,7 +16,7 @@ Given a `example/dom.generated.d.ts` containing
     
 and a dart file `example/dom.dart`,
 
-    @DefinitelyTyped('dom.d.ts')
+    @DefinitelyTyped('example/dom.d.ts')
     library dts2dart.example.example;
 
     import 'package:definitely_typed/definitely_typed.dart';
@@ -34,7 +34,7 @@ Test it with
 
     $ pub run test example --platform dartium,chrome
     
-See the `example` folder (in the repository)[https://github.com/jirkadanek/definitely_typed].
+See the `example` folder [in the repository](https://github.com/jirkadanek/definitely_typed).
 
 ## Similar efforts
 
@@ -47,25 +47,32 @@ See the `example` folder (in the repository)[https://github.com/jirkadanek/defin
 
 There is probably going to be a significant functionality overlap with https://github.com/angular/ts2dart (written in TypeScript, not Dart; can it transpile itself?).
 
-#### Bugs that dts2dart will solve
+#### Bugs that definitely_typed.dart solves
 
+ * https://github.com/dart-lang/sdk/issues/23423
+ * https://github.com/dart-lang/sdk/issues/20215
+ * https://github.com/dart-lang/sdk/issues/20189
  * https://stackoverflow.com/questions/29606183/automate-javascript-interop-in-dart
+ 
+It might be a good idea to preserve documentation comments when lexing and parsing
+ 
+ * https://github.com/dart-lang/sdk/issues/22948
 
 ## Overview
 
 ### TypeScript side
 
-Declaration source files have a suffix `,d.ts` and contain only type definitions (see section 3 in TypeScript 1.6 specification) and ambient declarations (section 1.1 of the specification). See http://www.typescriptlang.org/Handbook#writing-dts-files to get a feel for it.
+Declaration source files have a suffix `.d.ts` and contain only type definitions (see section 3 in TypeScript 1.6 specification) and ambient declarations (section 1.1 of the specification). See http://www.typescriptlang.org/Handbook#writing-dts-files to get a feel for it.
 
-### Dart side (WIP)
+### Dart side (still WIP)
 
-package:js provides a Js() annotation and there is an external keyword in dart 1.13-dev. Analyzer can typecheck calls to declared objects and dart2js generates efficient code that accesses them. See
+package:js provides a Js() annotation and there is an external keyword in dart 1.13-dev. Analyzer can typecheck calls to declared objects and dart2js generates efficient code that accesses them. See https://pub.dartlang.org/packages/js for the details.
 
 ## This repository (wIP; not much Work done yet)
 
 ### Goals
 
-Write in Dart. Create a vertical slice of the following functionality
+Write everything in Dart. Create a vertical slice of the following functionality
 
   - given a JavaScript file and a corresponding .t.ds file
   - parse the .d.ts
@@ -73,7 +80,7 @@ Write in Dart. Create a vertical slice of the following functionality
   - write it out
   - use it to call something in the JavaScript file from Dart
 
-then add features, then possibly break it into components: .t.ds parser, a gen client, ... ???
+then add features; then possibly break it into components: .t.ds parser, a source_gen generator class; add some more features; ... ???
 
 ### Non-goals
 
@@ -81,7 +88,7 @@ then add features, then possibly break it into components: .t.ds parser, a gen c
 
 ### Supported features
 
-For now see the tests. What is being tested works and vice versa.
+For now see the example and tests. What is being tested works and vice versa.
 
 ## Designs
 
@@ -106,7 +113,7 @@ I am going with 1a) using code at https://github.com/robpike/ivy and https://git
   
 Option 1 is more concrete regarding what needs doing. I will be pursuing that.
 
-### Testing
+### When it is done 
 
   - can parse https://github.com/Microsoft/TypeScript/blob/master/src/lib/dom.generated.d.ts
-  - can parse DefinitelyTyped definitions
+  - can parse all DefinitelyTyped .d.ts files
