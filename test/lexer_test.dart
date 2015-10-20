@@ -164,6 +164,18 @@ main() {
           'declare var name: string;', '<declare <var name: <type string>>>');
       parseString('declare var name: (string);');
       parseString('declare var name, age;');
+
+      parseString('declare var name: string[];');
+      parseString('declare var name: EventTarget;');
+
+      parseString('interface Algorithm {\n'
+          '    name?: string;\n'
+          '}');
+      parseString('interface EventListener {'
+          '    (evt: Event): void;'
+          '}');
+
+      parseString('interface AriaRequestEventInit extends EventInit {}');
     });
     test('generateStuff', () {
       expectCodeString('declare var name;', '@Js()external get name;\n');
@@ -178,6 +190,10 @@ main() {
       var n = -1;
       var tokens = lexFromFile('dom.generated.d.ts_de52865', n);
       //print(tokens);
+    });
+    test('can parse n lines', () {
+      var n = 183; // 57 61 179 183 196
+      var tree = parseFromFile('dom.generated.d.ts_de52865', n);
     });
     test('can put first n lines through the whole process', () {
       var n = 5;
@@ -224,10 +240,15 @@ parseString(s) {
   return ast;
 }
 
-String generateCodeFromFile(String path, [int nlines = -1]) {
+parseFromFile(String path, int nlines) {
   var ls = lexFromFile(path, nlines);
   var p = new Parser();
   var ps = p.parse(ls);
+  return ps;
+}
+
+String generateCodeFromFile(String path, [int nlines = -1]) {
+  var ps = parseFromFile(path, nlines);
   var v = new CodeGeneratingVisitor();
   for (var n in ps) {
     n.accept(v);
@@ -276,7 +297,9 @@ class Lexer {
         tokens.add(new Token(TokenType.EOF, ''));
         return tokens;
       }
-      var operator = new RegExp('(${Lexemes.operators.map(escapeRegex).join(')|(')})').matchAsPrefix(s, pos);
+      var operator =
+          new RegExp('(${Lexemes.operators.map(escapeRegex).join(')|(')})')
+              .matchAsPrefix(s, pos);
       if (operator != null) {
         tokens.add(new Token(TokenType.OPERATOR, operator.group(0)));
         pos += operator.group(0).length;
@@ -303,7 +326,8 @@ class Lexer {
         lexBlockComment(s);
         continue;
       }
-      var nextWord = new RegExp(r'[A-Za-z_][A-Za-z0-9_]*').matchAsPrefix(s, pos);
+      var nextWord =
+          new RegExp(r'[A-Za-z_][A-Za-z0-9_]*').matchAsPrefix(s, pos);
       if (nextWord != null) {
         if (Lexemes.keywords.contains(nextWord.group(0))) {
           tokens.add(new Token(TokenType.KEYWORD, nextWord.group(0)));
@@ -318,7 +342,7 @@ class Lexer {
   }
 
   void lexBlockComment(String s) {
-    while(pos < s.length) {
+    while (pos < s.length) {
       if (s[pos] == '*') {
         pos++;
         if (pos < s.length && s[pos] == '/') {
@@ -351,7 +375,7 @@ class Lexer {
     pos++;
     while (pos < s.length) {
       if (s[pos] == c) {
-        tokens.add(new Token(TokenType.STRING, s.substring(p+1, pos)));
+        tokens.add(new Token(TokenType.STRING, s.substring(p + 1, pos)));
         pos++;
         return;
       }
@@ -468,7 +492,7 @@ class Parser {
 
     List<Node> nodes = [];
     for (var t = peek(); t.type != TokenType.EOF; t = peek()) {
-      nodes.add(_AmbientDeclaration());
+      nodes.add(_NamespaceElement());
     }
     consume();
     return nodes;
@@ -511,7 +535,16 @@ class Parser {
   //   TupleType
   //   TypeQuery
   _PrimaryType() {
-    return expectOneOf([_ParenthesizedType, _PredefinedType]);
+    var type =
+        expectOneOf([_ParenthesizedType, _PredefinedType, _TypeReference]);
+    var t = peek();
+    if (t.value == '[') {
+      //TODO(jirka): arrays of arrays? array of set of arrays? ...
+      expect('[');
+      expect(']');
+      type = new ArrayType(type);
+    }
+    return type;
   }
 
   // ParenthesizedType:
@@ -535,12 +568,118 @@ class Parser {
     if ('any number boolean string symbol void'.split(' ').contains(t.value)) {
       consume();
     } else {
-      throw LookaheadError;
+      throw new LookaheadError();
     }
     return new PredefinedType(t.value);
   }
 
+  // TypeReference:
+  // TypeName [no LineTerminator here] TypeArguments(opt)
+  _TypeReference() {
+    return _TypeName();
+  }
+
   // TODO:
+
+  // ObjectType:
+  //   { TypeBody(opt) }
+  _ObjectType() {
+    lookFor('{');
+    List typeBody;
+    var t = peek();
+    if (t.value != '}') {
+      // safer than try catch
+      //try {
+      typeBody = _TypeBody();
+      //} on LookaheadError catch(_) {}
+    }
+    expect('}');
+    return new ObjectType(typeBody);
+  }
+
+  // TypeBody:
+  //   TypeMemberList ;opt
+  //   TypeMemberList ,opt
+  _TypeBody() {
+    //throw('type body');
+    var typeMemberList = _TypeMemberList();
+    var t = peek();
+    if (t.value == ';' || t.value == ',') {
+      consume();
+    }
+    return typeMemberList;
+  }
+
+  // TypeMemberList:
+  //   TypeMember
+  //   TypeMemberList ; TypeMember
+  //   TypeMemberList , TypeMember
+  _TypeMemberList() {
+    //throw('type memeber list');
+    var list = [];
+    while (true) {
+      list.add(_TypeMember());
+      //throw(list.toString());
+      var t = peek();
+      if (t.value == ';' || t.value == ',') {
+        consume();
+        t = peek();
+        if (t.value == '}') {
+          // HACK: meaning the ;} is part of an enclosing _TypeBody
+          break;
+        }
+      } else {
+        break;
+      }
+    }
+    return list;
+  }
+
+  // TypeMember:
+  //   PropertySignature
+  //   CallSignature
+  //   ConstructSignature
+  //   IndexSignature
+  //   MethodSignature
+  _TypeMember() {
+    return expectOneOf([_CallSignature, _PropertySignature]);
+  }
+
+  // ArrayType:
+  //   PrimaryType [no LineTerminator here] [ ]
+  _ArrayType() {
+    throw ('implemented in _PrimaryType');
+  }
+
+  // TODO:
+
+  // PropertySignature:
+  //   PropertyName ?(opt) TypeAnnotation(opt)
+  _PropertySignature() {
+    //throw('property signature');
+    var name = _PropertyName();
+    //throw(name.toString());
+    var t = peek();
+    var nullable;
+    if (t.value == '?') {
+      nullable = true;
+      consume();
+    }
+    var typeAnnotation;
+    try {
+      typeAnnotation = _TypeAnnotation();
+    } on LookaheadError catch (_) {}
+    return new PropertySignature(name, nullable, typeAnnotation);
+  }
+
+  //  PropertyName:
+  //   IdentifierName
+  //   StringLiteral
+  //   NumericLiteral
+  _PropertyName() {
+    //TODO(jirka): requires design, these literals might be a problem for Dart
+    return _BindingIdentifier(); //FIXME
+  }
 
   // TypeAnnotation:
   //   : Type
@@ -548,6 +687,81 @@ class Parser {
     lookFor(':');
     return _Type();
   }
+
+  // CallSignature:
+  //   TypeParameters(opt) ( ParameterList(opt) ) TypeAnnotation(opt)
+  _CallSignature() {
+    lookFor('(');
+    var parameterList = tryParse(_ParameterList);
+    //throw(parameterList.toString());
+    expect(')');
+    var typeAnnotation = tryParse(_TypeAnnotation);
+    return new CallSignature(parameterList, typeAnnotation);
+  }
+
+// ParameterList:
+//   RequiredParameterList
+//   OptionalParameterList
+//   RestParameter
+//   RequiredParameterList , OptionalParameterList
+//   RequiredParameterList , RestParameter
+//   OptionalParameterList , RestParameter
+//   RequiredParameterList , OptionalParameterList , RestParameter
+  _ParameterList() {
+    return _RequiredParameterList();
+  }
+
+//  RequiredParameterList:
+//   RequiredParameter
+//   RequiredParameterList , RequiredParameter
+  _RequiredParameterList() {
+    return _RequiredParameter();
+  }
+
+//  RequiredParameter:
+//   AccessibilityModifier(opt) BindingIdentifierOrPattern TypeAnnotation(opt)
+//   BindingIdentifier : StringLiteral
+  _RequiredParameter() {
+    //throw('required parameter');
+    var identifierOrPattern = _BindingIdentifierOrPattern();
+    consume(); //FIXME: it should've been consumed already
+    //throw('identifier or pattern');
+    var typeAnnotation = tryParse(_TypeAnnotation);
+    //throw('annotation');
+    return new RequiredParameter(identifierOrPattern, typeAnnotation);
+  }
+
+//  AccessibilityModifier:
+//   public
+//   private
+//   protected
+  _AccessiblitityModifier() {
+    var t = peek();
+    if ('public private protected'.split(' ').contains(t.value)) {
+      consume();
+      return t.value;
+    }
+    throw new LookaheadError();
+  }
+
+//  BindingIdentifierOrPattern:
+//   BindingIdentifier
+//   BindingPattern
+  _BindingIdentifierOrPattern() {
+    return _BindingIdentifier;
+  }
+
+//  OptionalParameterList:
+//   OptionalParameter
+//   OptionalParameterList , OptionalParameter
+
+//  OptionalParameter:
+//   AccessibilityModifieropt BindingIdentifierOrPattern ? TypeAnnotationopt
+//   AccessibilityModifieropt BindingIdentifierOrPattern TypeAnnotationopt Initializer
+//   BindingIdentifier ? : StringLiteral
+
+//  RestParameter:
+//   ... BindingIdentifier TypeAnnotationopt
 
   //TODO:
 
@@ -577,6 +791,12 @@ class Parser {
     return result;
   }
 
+  // my creations
+
+  _TypeName() {
+    return _BindingIdentifier();
+  }
+
   void consume() {
     pos++;
   }
@@ -599,7 +819,7 @@ class Parser {
       if (t.value == o) {
         consume();
       } else {
-        throw new ParsingError();
+        throw new ParsingError('expecting ${o} encountered ${t}');
       }
     }
   }
@@ -664,6 +884,69 @@ class Parser {
 
   // TODO
 
+  //****
+  // A.5 Interfaces
+  //****
+
+  // InterfaceDeclaration:
+  //   interface BindingIdentifier TypeParameters(opt) InterfaceExtendsClause(opt) ObjectType
+  _InterfaceDeclaration() {
+    lookFor('interface');
+    var bindingIdentifier = _BindingIdentifier();
+    var interfaceExtendsClause = tryParse(_InterfaceExtendsClause);
+    var objectType = _ObjectType();
+    return new InterfaceDeclaration(bindingIdentifier, objectType);
+  }
+
+  // InterfaceExtendsClause:
+  //   extends ClassOrInterfaceTypeList
+  _InterfaceExtendsClause() {
+    lookFor('extends');
+    return _ClassOrInterfaceTypeList();
+  }
+
+  // ClassOrInterfaceTypeList:
+  //   ClassOrInterfaceType
+  //   ClassOrInterfaceTypeList , ClassOrInterfaceType
+  _ClassOrInterfaceTypeList() {
+    return [_ClassOrInterfaceType()];
+  }
+
+  // ClassOrInterfaceType:
+  //   TypeReference
+  _ClassOrInterfaceType() {
+    return _TypeReference();
+  }
+
+  tryParse(f) {
+    try {
+      return f();
+    } on LookaheadError catch (_) {}
+  }
+
+  //*****
+  // A.8 Namespaces
+  //*****
+
+  // TODO
+
+  // NamespaceElement:
+  //   Statement
+  //   LexicalDeclaration
+  //   FunctionDeclaration
+  //   GeneratorDeclaration
+  //   ClassDeclaration
+  //   InterfaceDeclaration
+  //   TypeAliasDeclaration
+  //   EnumDeclaration
+  //   NamespaceDeclaration
+  //   AmbientDeclaration
+  //   ImportAliasDeclaration
+  //   ExportNamespaceElement
+  _NamespaceElement() {
+    return expectOneOf([_InterfaceDeclaration, _AmbientDeclaration]);
+  }
+
   _BindingIdentifier() {
     return expectIdentifier();
   }
@@ -671,7 +954,10 @@ class Parser {
   expectIdentifier() {
     final t = next();
     if (t.type != TokenType.IDENTIFIER) {
-      throw new ParsingError('expected IDENTIFIER, got $t');
+      var from = max(0, pos - 10);
+      var to = min(tokens.length - 1, pos + 5);
+      throw new ParsingError(
+          'expected IDENTIFIER, got $t in ${tokens.sublist(from, to)}');
     }
     return t.value;
   }
@@ -680,6 +966,45 @@ class Parser {
   final _var = new Token(TokenType.KEYWORD, 'var');
   final _let = new Token(TokenType.KEYWORD, 'let');
   final _const = new Token(TokenType.KEYWORD, 'const');
+}
+
+class RequiredParameter {
+  var identifierOrPattern;
+  var typeAnnotation;
+  RequiredParameter(this.identifierOrPattern, this.typeAnnotation);
+}
+
+class CallSignature {
+  var parameterList;
+  var typeDeclaration; // TODO: Node or TypeScriptType I guess
+  CallSignature(this.parameterList, this.typeDeclaration);
+}
+
+class TypeScriptType {
+  PredefinedType type;
+  TypeScriptType(this.type);
+}
+
+class ArrayType extends TypeScriptType {
+  ArrayType(type) : super(type);
+}
+
+class ObjectType {
+  var typeBody;
+  ObjectType(this.typeBody);
+}
+
+class InterfaceDeclaration {
+  String binding;
+  var type;
+  InterfaceDeclaration(this.binding, this.type);
+}
+
+class PropertySignature {
+  String name;
+  bool nullable;
+  var type; // PredefinedType TypeScriptType ArrayType
+  PropertySignature(this.name, this.nullable, this.type);
 }
 
 class PredefinedType extends Node {
