@@ -13,7 +13,7 @@ Lets use TypeScript definitions (e.g. from DefinitelyTyped) to generate package:
 Given a `example/dom.generated.d.ts` containing
 
     declare var name: string;
-    
+
 and a dart file `example/dom.dart`,
 
     @DefinitelyTyped('example/dom.d.ts')
@@ -22,18 +22,20 @@ and a dart file `example/dom.dart`,
     import 'package:definitely_typed/definitely_typed.dart';
 
     part 'dom.g.dart';
-    
-the script `bin/build.dart` generates `example/dom.g.dart`.
+
+the script `bin/build.dart` 
 
     $ dart bin/build.dart
 
+generates `example/dom.g.dart`.
+
     @Js()
     external String get name;
-    
+
 Test it with
 
     $ pub run test example --platform dartium,chrome
-    
+
 See the `example` folder [in the repository](https://github.com/jirkadanek/definitely_typed).
 
 ## Similar efforts
@@ -85,6 +87,7 @@ then add features; then possibly break it into components: .t.ds parser, a sourc
 ### Non-goals
 
   - good error messages for .d.ts: use tested .d.ts files; write .d.ts files in an IDE that hints at errors as you make them; test with the TypeScript compiler.
+  - complete TypeScript parser: .d.ts files use only a subset of the full TypeScript syntax
 
 ### Supported features
 
@@ -92,10 +95,11 @@ For now see the example and tests. What is being tested works and vice versa.
 
 ## Designs
 
-### Name
+### Naming
 
   - dts2dart, after ts2dart
   - DefinitelyTyped or DefinitelyTyped.dart, after DefinitelyTyped
+  - annotate with @DefinitelyTyped("") or @TS("") or @DTS("")
   
 I come to dislike dts2dart. It does not type well. Annotating with @DefinitelyTyped('filepath.d.ts') reads almost like a link, (at).
 
@@ -109,9 +113,9 @@ I am going with 1a) using code at https://github.com/robpike/ivy and https://git
 ### User experience
 
   - Option 1: https://github.com/dart-lang/source_gen and annotation that specifies what .d.ts I want to use; How to get the .d.ts?
-  - Option 2: generate Dart code for all DefinitelyTyped .d.ts files and upload everything to Dart Pub
+  - Option 2: generate Dart code for popular DefinitelyTyped .d.ts files and upload everything to Dart Pub
   
-Option 1 is more concrete regarding what needs doing. I will be pursuing that.
+Option 1 is more concrete regarding what needs doing. I will be pursuing that. Option 2 has the advantage that it is _me_ who discovers breakages caused by incompletely implemented parser, not the poor people trying to use the package.
 
 ### When it is done 
 

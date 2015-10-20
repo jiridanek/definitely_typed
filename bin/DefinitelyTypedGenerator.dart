@@ -9,10 +9,7 @@ import 'package:source_gen/source_gen.dart';
 import 'package:path/path.dart' as path;
 import 'package:dts2dart/definitely_typed.dart';
 
-import 'dart:io';
-import 'dart:convert';
-import 'dart:async';
-import '../test/lexer_test.dart' as codeblob;
+import 'package:dts2dart/typescript/typescript.dart';
 
 class DefinitelyTypedGenerator extends GeneratorForAnnotation<DefinitelyTyped> {
   final AssociatedFileSet associatedFileSet;
@@ -27,6 +24,6 @@ class DefinitelyTypedGenerator extends GeneratorForAnnotation<DefinitelyTyped> {
       throw 'must be relative path to the source file';
     }
 
-    return codeblob.generateCodeFromFile(annotation.path);
+    return generateFromFile(annotation.path);
   }
 }
