@@ -29,4 +29,23 @@ main() {
       expect(await stream.first, 'first line');
     });
   });
+  group('async', () {
+    test('failing async function is not caught in sync test', () {
+      asyncFuncThatThrows();
+    });
+    test('failing async function not caught in async test', () async {
+      asyncFuncThatThrows();
+    });
+    test('sync: have to pass a closure, not invoke it', () {
+      expect(
+          (() => throw 'an error') /*()*/, throwsA(new isInstanceOf<String>()));
+    });
+    test('async: just expect on that Future; marking async not necessary', () {
+      expect(asyncFuncThatThrows(), throwsA('an error'));
+    });
+  });
+}
+
+asyncFuncThatThrows() async {
+  throw 'an error';
 }

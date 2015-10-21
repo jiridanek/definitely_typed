@@ -12,7 +12,7 @@ class Parser {
     for (var t = peek(); t.type != TokenType.EOF; t = peek()) {
       nodes.add(_NamespaceElement());
     }
-    consume();
+    consume(); // the EOF
     return nodes;
   }
 
@@ -53,8 +53,10 @@ class Parser {
   //   TupleType
   //   TypeQuery
   _PrimaryType() {
-    var type =
-        expectOneOf([_ParenthesizedType, _PredefinedType, _TypeReference]);
+    var type = expectOneOf(
+        [_ParenthesizedType, _PredefinedType, _ObjectType, _TypeReference]);
+
+    // array modifier
     var t = peek();
     if (t.value == '[') {
       //TODO(jirka): arrays of arrays? array of set of arrays? ...
@@ -156,7 +158,40 @@ class Parser {
   //   IndexSignature
   //   MethodSignature
   _TypeMember() {
-    return expectOneOf([_CallSignature, _PropertySignature]);
+    var result = tryParse(_CallSignature);
+    if (result != null) {
+      return result;
+    }
+
+    /* */ _PropertySignature;
+    /* or */
+    _MethodSignature;
+
+    var name = tryParse(_PropertyName);
+    if (name == null) {
+      throw new LookaheadError();
+    }
+
+    var t = peek();
+    var nullable;
+    if (t.value == '?') {
+      nullable = true;
+      consume();
+    }
+
+    // _PropertySignature
+
+    var typeAnnotation = tryParse(_TypeAnnotation);
+    if (typeAnnotation != null) {
+      return new PropertySignature(name, nullable, typeAnnotation);
+    }
+
+    // _MethodSignature
+
+    var callSignature = tryParse(_CallSignature);
+    if (callSignature != null) {
+      return new MethodSignature(name, nullable, callSignature);
+    }
   }
 
   // ArrayType:
@@ -227,7 +262,13 @@ class Parser {
 //   RequiredParameter
 //   RequiredParameterList , RequiredParameter
   _RequiredParameterList() {
-    return _RequiredParameter();
+    var list = [];
+    list.add(_RequiredParameter());
+    for (var t = peek(); t.value == ','; t = peek()) {
+      consume();
+      list.add(_RequiredParameter());
+    }
+    return list;
   }
 
 //  RequiredParameter:
@@ -235,7 +276,6 @@ class Parser {
 //   BindingIdentifier : StringLiteral
   _RequiredParameter() {
     var identifierOrPattern = _BindingIdentifierOrPattern();
-    consume(); //FIXME: it should've been consumed already
     var typeAnnotation = tryParse(_TypeAnnotation);
     return new RequiredParameter(identifierOrPattern, typeAnnotation);
   }
@@ -257,7 +297,7 @@ class Parser {
 //   BindingIdentifier
 //   BindingPattern
   _BindingIdentifierOrPattern() {
-    return _BindingIdentifier;
+    return _BindingIdentifier();
   }
 
 //  OptionalParameterList:
@@ -273,6 +313,14 @@ class Parser {
 //   ... BindingIdentifier TypeAnnotation(opt)
 
   //TODO:
+
+  // MethodSignature:
+  //   PropertyName ?opt CallSignature
+  _MethodSignature() {
+    throw ('implemented in higher-up productions');
+  }
+
+  // TODO:
 
   //****
   // A.5 Interfaces
@@ -338,16 +386,25 @@ class Parser {
   }
 
   _BindingIdentifier() {
-    return expectIdentifier();
+    return lookForIdentifier();
   }
 
   expectIdentifier() {
     final t = next();
-    if (t.type != TokenType.IDENTIFIER) {
-      throw new ParsingError(
-          'expected IDENTIFIER, got $t in ${contextForError()}');
+    if (t.type == TokenType.IDENTIFIER) {
+      return t.value;
     }
-    return t.value;
+    throw new ParsingError(
+        'expected IDENTIFIER, got $t in ${contextForError()}');
+  }
+
+  lookForIdentifier() {
+    final t = peek();
+    if (t.type == TokenType.IDENTIFIER) {
+      consume();
+      return t.value;
+    }
+    throw new LookaheadError();
   }
 
   //TODO:
@@ -377,8 +434,6 @@ class Parser {
     }
     return result;
   }
-
-  // my creations
 
   // AmbientVariableDeclaration:
   //   var AmbientBindingList ;
@@ -449,7 +504,8 @@ class Parser {
       if (t.value == o) {
         consume();
       } else {
-        throw new ParsingError('expecting ${o} encountered ${t} in ${contextForError()}');
+        throw new ParsingError(
+            'expecting ${o} encountered ${t} in ${contextForError()}');
       }
     }
   }
@@ -481,6 +537,13 @@ class Parser {
   final _var = new Token(TokenType.KEYWORD, 'var');
   final _let = new Token(TokenType.KEYWORD, 'let');
   final _const = new Token(TokenType.KEYWORD, 'const');
+}
+
+class MethodSignature {
+  var name;
+  var nullable;
+  var callSignature;
+  MethodSignature(this.name, this.nullable, this.callSignature);
 }
 
 class ParsingError extends StateError {

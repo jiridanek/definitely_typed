@@ -13,7 +13,7 @@ class Lexemes {
   //TODO: not complete
 
   // contextual keywords: any number boolean string symbol void //TODO: not complete // lets treat them as identifiers for now
-  static final keywords = 'extends new private public protected function interface '
+  static final keywords = 'extends private public protected function interface ' // new
       'declare var let const function class constructor static namespace export module' //section A.11
       .split(' ');
 }

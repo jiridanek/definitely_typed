@@ -174,6 +174,18 @@ main() {
       parseString('interface EventListener {'
           '    (evt: Event): void;'
           '}');
+      parseString('interface I { f() }');
+      parseString('interface I { f(arg: string): void }');
+      parseString('interface I { f(arg1, arg2) }');
+
+      parseString('declare var v: {};');
+      parseString('declare var v: { new(): void };');
+
+      parseString('declare var ANGLE_instanced_arrays: {\n'
+          '    prototype: ANGLE_instanced_arrays;\n'
+          '//    new(): ANGLE_instanced_arrays;\n'
+          '    VERTEX_ATTRIB_ARRAY_DIVISOR_ANGLE: number;\n'
+          '};');
 
       parseString('interface AriaRequestEventInit extends EventInit {}');
     });
@@ -195,7 +207,7 @@ main() {
       var tokens = lexFromFile('dom.generated.d.ts_de52865', n);
     });
     test('can parse n lines', () {
-      var n = 183; // 57 61 179 183 196
+      var n = 190; // 57 61 179 183 190 196
       var tree = parseFromFile('dom.generated.d.ts_de52865', n);
     });
     test('can put first n lines through the whole process', () {
