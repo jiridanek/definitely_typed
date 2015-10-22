@@ -23,7 +23,7 @@ class CallSignature {
 }
 
 class TypeScriptType {
-  PredefinedType type;
+  var type;
   TypeScriptType(this.type);
 }
 

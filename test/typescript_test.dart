@@ -189,8 +189,12 @@ main() {
       parseString('interface CRC2D {fS: string | CG;}');
       parseString('interface CRC2D {fS: string | CG | CP;}');
 
+      parseString('interface I {f(...optionalParams: any[]): void;}');
+
       parseString('declare var v: {};');
       parseString('declare var v: { new(): void };');
+
+      parseString('interface I {f(x: NodeListOf<Element>);}');
 
       parseString('declare var ANGLE_instanced_arrays: {\n'
           '    prototype: ANGLE_instanced_arrays;\n'
@@ -219,7 +223,7 @@ main() {
       var tokens = lexFromFile('dom.generated.d.ts_de52865', n);
     });
     test('can parse n lines', () {
-      var n = 1237; // 57 61 179 183 190 196 224 254 270 427 441 1067 1145 1237
+      var n = 3029; // 57 61 179 183 190 196 224 254 270 427 441 1067 1145 1237 3029
       var tree = parseFromFile('dom.generated.d.ts_de52865', n);
     });
     test('can put first n lines through the whole process', () {

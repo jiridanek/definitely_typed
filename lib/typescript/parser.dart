@@ -20,7 +20,54 @@ class Parser {
   // A.1 Types
   //****
 
-  //TODO:
+//  // TypeParameters:
+//  //   < TypeParameterList >
+//  _TypeParameters() {
+//    lookFor('<');
+//    var typeParameterList = _TypeParameterList();
+//    expect('>');
+//    return typeParameterList;
+//  }
+//
+//  // TypeParameterList:
+//  //   TypeParameter
+//  //   TypeParameterList , TypeParameter
+//  _TypeParameterList() {
+//    return parseListOf(_TypeParameter, ',');
+//  }
+//
+//  // TypeParameter:
+//  //   BindingIdentifier Constraint(opt)
+//  _TypeParameter() {
+//    var bindingIdentifier = _BindingIdentifier();
+//    var constraint = tryParse(_constraint);
+//    return [bindingIdentifier, constraint];
+//  }
+//
+//  // Constraint:
+//  //   extends Type
+//  _Constraint() {
+//    lookFor('extends');
+//    return _Type;
+//  }
+//
+  // TypeArguments:
+  //   < TypeArgumentList >
+  _TypeArguments() {
+    lookFor('<');
+    var typeArgumentList = _TypeArgumentList();
+    expect('>');
+  }
+
+  // TypeArgumentList:
+  //   TypeArgument
+  //   TypeArgumentList , TypeArgument
+  _TypeArgumentList() {
+    return parseListOf(_Type, ',');
+  }
+
+  // TypeArgument:
+  //   Type
 
   // Type:
   //   UnionOrIntersectionOrPrimaryType
@@ -39,17 +86,8 @@ class Parser {
   //   UnionType
   //   IntersectionOrPrimaryType
   _UnionOrIntersectionOrPrimaryType() {
-    var union = [];
-    union.add(_IntersectionOrPrimaryType());
-    //return result;
-    while (true) {
-      var isUnion = tryParse(() => lookFor('|')) != null;
-      if (isUnion) {
-        union.add(_IntersectionOrPrimaryType());
-      } else {
-        return (union.length == 1) ? union.first : union;
-      }
-    }
+    var list = parseListOf(_IntersectionOrPrimaryType, '|');
+    return (list.length == 1) ? list.first : list;
   }
 
   // IntersectionOrPrimaryType:
@@ -114,7 +152,9 @@ class Parser {
   // TypeReference:
   // TypeName [no LineTerminator here] TypeArguments(opt)
   _TypeReference() {
-    return _TypeName();
+    var typename = _TypeName();
+    var typeArguments = tryParse(_TypeArguments);
+    return typename;
   }
 
   // TODO:
@@ -316,39 +356,16 @@ class Parser {
 //   RequiredParameterList , RestParameter
 //   OptionalParameterList , RestParameter
 //   RequiredParameterList , OptionalParameterList , RestParameter
+
 // NOTE(jirka): required, then optional, then rest
-  _ParameterList() {
-    return _requiredOptionalParameterList();
-  }
 
 //  RequiredParameterList:
 //   RequiredParameter
 //   RequiredParameterList , RequiredParameter
-  _requiredOptionalParameterList() {
-    var list = [];
-    list.add(_requiredOptionalParameter());
-    for (var t = peek(); t.value == ','; t = peek()) {
-      consume();
-      list.add(_requiredOptionalParameter());
-    }
-    return list;
-  }
 
 //  RequiredParameter:
 //   AccessibilityModifier(opt) BindingIdentifierOrPattern TypeAnnotation(opt)
 //   BindingIdentifier : StringLiteral
-  _requiredOptionalParameter() {
-    var identifierOrPattern = _BindingIdentifierOrPattern();
-    var isOptional = tryParse(() => lookFor('?'));
-    var t = lookahead(1);
-    if (t.type != TokenType.STRING) {
-      var typeAnnotation = tryParse(_TypeAnnotation);
-      return new RequiredParameter(identifierOrPattern, typeAnnotation);
-    }
-    expect(':');
-    var stringLiteral = next().value;
-    return new RequiredParameter(identifierOrPattern, stringLiteral);
-  }
 
 //  AccessibilityModifier:
 //   public
@@ -366,9 +383,6 @@ class Parser {
 //  BindingIdentifierOrPattern:
 //   BindingIdentifier
 //   BindingPattern
-  _BindingIdentifierOrPattern() {
-    return _BindingIdentifier();
-  }
 
 //  OptionalParameterList:
 //   OptionalParameter
@@ -381,6 +395,39 @@ class Parser {
 
 //  RestParameter:
 //   ... BindingIdentifier TypeAnnotation(opt)
+
+  _ParameterList() {
+    return parseListOf(_Parameter, ',');
+  }
+
+  _Parameter() {
+    var t = peek();
+    if (t.value == '...') {
+      consume();
+      var identifier = _BindingIdentifier();
+      var typeAnnotation = tryParse(_TypeAnnotation);
+      return new RequiredParameter(identifier, typeAnnotation);
+    }
+    var identifierOrPattern = _BindingIdentifierOrPattern();
+    var isOptional = false;
+    t = peek();
+    if (t.value == '?') {
+      consume();
+      isOptional = true;
+    }
+    t = lookahead(1);
+    if (t.type == TokenType.STRING) {
+      expect(':');
+      var stringLiteral = next().value;
+      return new RequiredParameter(identifierOrPattern, stringLiteral);
+    }
+    var typeAnnotation = tryParse(_TypeAnnotation);
+    return new RequiredParameter(identifierOrPattern, typeAnnotation);
+  }
+
+  _BindingIdentifierOrPattern() {
+    return _BindingIdentifier();
+  }
 
   //TODO:
 
@@ -431,17 +478,7 @@ class Parser {
   //   ClassOrInterfaceType
   //   ClassOrInterfaceTypeList , ClassOrInterfaceType
   _ClassOrInterfaceTypeList() {
-    var typeList = [_ClassOrInterfaceType()];
-    while (true) {
-      //FIXME(jirka): refactor all such loops into a higher order function
-      var t = peek();
-      if (t.value == ',') {
-        consume();
-        typeList.add(_ClassOrInterfaceType());
-      } else {
-        return typeList;
-      }
-    }
+    return parseListOf(_ClassOrInterfaceType, ',');
   }
 
   // ClassOrInterfaceType:
@@ -521,26 +558,14 @@ class Parser {
   //   AmbientBinding
   //   AmbientBindingList , AmbientBinding
   _AmbientBindingList() {
-    var bindings = [];
-    while (true) {
-      bindings.add(_AmbientBinding());
-      final t = peek();
-      if (t.value != ',') {
-        break;
-      }
-      consume();
-    }
-    return bindings;
+    return parseListOf(_AmbientBinding, ',');
   }
 
   // AmbientBinding:
   //   BindingIdentifier TypeAnnotation(opt)
   _AmbientBinding() {
     var identifier = _BindingIdentifier();
-    var annotation;
-    try {
-      annotation = _TypeAnnotation();
-    } on LookaheadError catch (_) {}
+    var annotation = tryParse(_TypeAnnotation);
     return new AmbientBinding(identifier, annotation);
   }
 
@@ -590,6 +615,7 @@ class Parser {
     throw ParsingError;
   }
 
+  //TODO(jirka): consider something for tryParse(() => lookFor())
   bool lookFor(s) {
     final t = peek();
     if (t.value != s) {
@@ -631,6 +657,17 @@ class Parser {
     var from = max(0, pos - 10);
     var to = min(tokens.length - 1, pos + 5);
     return tokens.sublist(from, to);
+  }
+
+  parseListOf(f, String sep) {
+    var list = [];
+    var seps = sep.split('');
+    list.add(f());
+    for (var t = peek(); seps.contains(t.value); t = peek()) {
+      consume();
+      list.add(f());
+    }
+    return list;
   }
 
   final _declare = new Token(TokenType.KEYWORD, 'declare');
