@@ -439,10 +439,11 @@ class Parser {
   //   var AmbientBindingList ;
   //   let AmbientBindingList ;
   //   const AmbientBindingList ;
+  //NOTE(jirka): I am making the ; optional here
   _AmbientVariableDeclaration() {
     consume();
     var bindings = _AmbientBindingList();
-    expect(';');
+    tryParse(() => lookFor(';'));
     return new AmbientVariableDeclaration(bindings);
   }
 

@@ -157,6 +157,8 @@ main() {
 
   group('parser', () {
     test('parse stuff', () {
+      parseString('declare var name');
+
       expectParsedString('declare var name;', '<declare <var name>>');
       expectParsedString('declare var name;\ndeclare var status;',
           '<declare <var name>><declare <var status>>');
@@ -207,7 +209,7 @@ main() {
       var tokens = lexFromFile('dom.generated.d.ts_de52865', n);
     });
     test('can parse n lines', () {
-      var n = 190; // 57 61 179 183 190 196
+      var n = 224; // 57 61 179 183 190 196 224 254 270
       var tree = parseFromFile('dom.generated.d.ts_de52865', n);
     });
     test('can put first n lines through the whole process', () {
