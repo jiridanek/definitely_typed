@@ -27,6 +27,11 @@ class Parser {
   //   FunctionType
   //   ConstructorType
   _Type() {
+    //FIXME(jirka): it is hard to distinguish parenthesized type and function type
+    var functionType = tryParse(_FunctionType);
+    if (functionType != null) {
+      return functionType;
+    }
     return _UnionOrIntersectionOrPrimaryType();
   }
 
@@ -34,7 +39,17 @@ class Parser {
   //   UnionType
   //   IntersectionOrPrimaryType
   _UnionOrIntersectionOrPrimaryType() {
-    return _IntersectionOrPrimaryType();
+    var union = [];
+    union.add(_IntersectionOrPrimaryType());
+    //return result;
+    while (true) {
+      var isUnion = tryParse(() => lookFor('|')) != null;
+      if (isUnion) {
+        union.add(_IntersectionOrPrimaryType());
+      } else {
+        return (union.length == 1) ? union.first : union;
+      }
+    }
   }
 
   // IntersectionOrPrimaryType:
@@ -53,8 +68,12 @@ class Parser {
   //   TupleType
   //   TypeQuery
   _PrimaryType() {
-    var type = expectOneOf(
-        [_ParenthesizedType, _PredefinedType, _ObjectType, _TypeReference]);
+    var type = expectOneOf([
+      /*_ParenthesizedType, */ _PredefinedType,
+      _ObjectType,
+      _TypeReference,
+      //_TupleType,
+    ]);
 
     // array modifier
     var t = peek();
@@ -162,6 +181,10 @@ class Parser {
     if (result != null) {
       return result;
     }
+    result = tryParse(_IndexSignature);
+    if (result != null) {
+      return result;
+    }
 
     /* */ _PropertySignature;
     /* or */
@@ -198,6 +221,45 @@ class Parser {
   //   PrimaryType [no LineTerminator here] [ ]
   _ArrayType() {
     throw ('implemented in _PrimaryType');
+  }
+
+  //TupleType:
+  //   [ TupleElementTypes ]
+//  _TupleType() {
+//    lookFor('[');
+//    var tupleElements;
+//    tupleElements.add(_Type());
+//    while (true) {
+//      var t = peek();
+//      if (t.value == ',') {
+//        consume();
+//        tupleElements.add(_Type());
+//      } else {
+//        expect(']');
+//        return tupleElements;
+//      }
+//    }
+//  }
+
+  //  TupleElementTypes:
+  //   TupleElementType
+  //   TupleElementTypes , TupleElementType
+
+  //  TupleElementType:
+  //   Type
+
+  // TODO:
+
+  // FunctionType:
+  //   TypeParameters(opt) ( ParameterListopt ) => Type
+  _FunctionType() {
+    //var typeParameters = tryParse(_TypeParameters);
+    lookFor('(');
+    var parameterList = tryParse(_ParameterList);
+    expect(')');
+    expect('=>');
+    var type = _Type();
+    return new FunctionType(parameterList, type);
   }
 
   // TODO:
@@ -254,19 +316,20 @@ class Parser {
 //   RequiredParameterList , RestParameter
 //   OptionalParameterList , RestParameter
 //   RequiredParameterList , OptionalParameterList , RestParameter
+// NOTE(jirka): required, then optional, then rest
   _ParameterList() {
-    return _RequiredParameterList();
+    return _requiredOptionalParameterList();
   }
 
 //  RequiredParameterList:
 //   RequiredParameter
 //   RequiredParameterList , RequiredParameter
-  _RequiredParameterList() {
+  _requiredOptionalParameterList() {
     var list = [];
-    list.add(_RequiredParameter());
+    list.add(_requiredOptionalParameter());
     for (var t = peek(); t.value == ','; t = peek()) {
       consume();
-      list.add(_RequiredParameter());
+      list.add(_requiredOptionalParameter());
     }
     return list;
   }
@@ -274,10 +337,17 @@ class Parser {
 //  RequiredParameter:
 //   AccessibilityModifier(opt) BindingIdentifierOrPattern TypeAnnotation(opt)
 //   BindingIdentifier : StringLiteral
-  _RequiredParameter() {
+  _requiredOptionalParameter() {
     var identifierOrPattern = _BindingIdentifierOrPattern();
-    var typeAnnotation = tryParse(_TypeAnnotation);
-    return new RequiredParameter(identifierOrPattern, typeAnnotation);
+    var isOptional = tryParse(() => lookFor('?'));
+    var t = lookahead(1);
+    if (t.type != TokenType.STRING) {
+      var typeAnnotation = tryParse(_TypeAnnotation);
+      return new RequiredParameter(identifierOrPattern, typeAnnotation);
+    }
+    expect(':');
+    var stringLiteral = next().value;
+    return new RequiredParameter(identifierOrPattern, stringLiteral);
   }
 
 //  AccessibilityModifier:
@@ -314,6 +384,20 @@ class Parser {
 
   //TODO:
 
+  //IndexSignature:
+  //   [ BindingIdentifier : string ] TypeAnnotation
+  //   [ BindingIdentifier : number ] TypeAnnotation
+  _IndexSignature() {
+    lookFor('[');
+    var identifier = expectIdentifier();
+    expect(':');
+    var indexType =
+        expectOneOf([() => lookFor('string'), () => lookFor('number')]);
+    expect(']');
+    var typeAnnotation = _TypeAnnotation();
+    return new IndexSignature(identifier, indexType, typeAnnotation);
+  }
+
   // MethodSignature:
   //   PropertyName ?opt CallSignature
   _MethodSignature() {
@@ -347,19 +431,23 @@ class Parser {
   //   ClassOrInterfaceType
   //   ClassOrInterfaceTypeList , ClassOrInterfaceType
   _ClassOrInterfaceTypeList() {
-    return [_ClassOrInterfaceType()];
+    var typeList = [_ClassOrInterfaceType()];
+    while (true) {
+      //FIXME(jirka): refactor all such loops into a higher order function
+      var t = peek();
+      if (t.value == ',') {
+        consume();
+        typeList.add(_ClassOrInterfaceType());
+      } else {
+        return typeList;
+      }
+    }
   }
 
   // ClassOrInterfaceType:
   //   TypeReference
   _ClassOrInterfaceType() {
     return _TypeReference();
-  }
-
-  tryParse(f) {
-    try {
-      return f();
-    } on LookaheadError catch (_) {}
   }
 
   //*****
@@ -387,24 +475,6 @@ class Parser {
 
   _BindingIdentifier() {
     return lookForIdentifier();
-  }
-
-  expectIdentifier() {
-    final t = next();
-    if (t.type == TokenType.IDENTIFIER) {
-      return t.value;
-    }
-    throw new ParsingError(
-        'expected IDENTIFIER, got $t in ${contextForError()}');
-  }
-
-  lookForIdentifier() {
-    final t = peek();
-    if (t.type == TokenType.IDENTIFIER) {
-      consume();
-      return t.value;
-    }
-    throw new LookaheadError();
   }
 
   //TODO:
@@ -520,12 +590,41 @@ class Parser {
     throw ParsingError;
   }
 
-  lookFor(s) {
+  bool lookFor(s) {
     final t = peek();
     if (t.value != s) {
       throw new LookaheadError();
     }
     consume();
+    return true;
+  }
+
+  lookahead(int n) {
+    return tokens[pos + n];
+  }
+
+  expectIdentifier() {
+    final t = next();
+    if (t.type == TokenType.IDENTIFIER) {
+      return t.value;
+    }
+    throw new ParsingError(
+        'expected IDENTIFIER, got $t in ${contextForError()}');
+  }
+
+  lookForIdentifier() {
+    final t = peek();
+    if (t.type == TokenType.IDENTIFIER) {
+      consume();
+      return t.value;
+    }
+    throw new LookaheadError();
+  }
+
+  tryParse(f) {
+    try {
+      return f();
+    } on LookaheadError catch (_) {}
   }
 
   contextForError() {
@@ -538,13 +637,6 @@ class Parser {
   final _var = new Token(TokenType.KEYWORD, 'var');
   final _let = new Token(TokenType.KEYWORD, 'let');
   final _const = new Token(TokenType.KEYWORD, 'const');
-}
-
-class MethodSignature {
-  var name;
-  var nullable;
-  var callSignature;
-  MethodSignature(this.name, this.nullable, this.callSignature);
 }
 
 class ParsingError extends StateError {

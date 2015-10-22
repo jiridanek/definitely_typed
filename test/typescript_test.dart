@@ -164,7 +164,7 @@ main() {
           '<declare <var name>><declare <var status>>');
       expectParsedString(
           'declare var name: string;', '<declare <var name: <type string>>>');
-      parseString('declare var name: (string);');
+      //parseString('declare var name: (string);');
       parseString('declare var name, age;');
 
       parseString('declare var name: string[];');
@@ -179,6 +179,15 @@ main() {
       parseString('interface I { f() }');
       parseString('interface I { f(arg: string): void }');
       parseString('interface I { f(arg1, arg2) }');
+      parseString('interface I {addEventListener(type: "cached");}');
+      parseString('interface I { aEL(l: (ev: E) => any);}');
+      parseString('interface I {aEL(uC?: boolean);}');
+      parseString('interface I {addEventListener(type: "cached", listener: (ev: Event) => any, useCapture?: boolean): void;}');
+
+      parseString('interface ATL {[index: number]: AudioTrack;}');
+
+      parseString('interface CRC2D {fS: string | CG;}');
+      parseString('interface CRC2D {fS: string | CG | CP;}');
 
       parseString('declare var v: {};');
       parseString('declare var v: { new(): void };');
@@ -190,6 +199,7 @@ main() {
           '};');
 
       parseString('interface AriaRequestEventInit extends EventInit {}');
+      parseString('interface A extends B, C {}');
     });
   });
 
@@ -204,12 +214,12 @@ main() {
   });
 
   group('from dom.d.ts', () {
-    test('can lex n lines', () {
+    skip_test('can lex n lines', () {
       var n = -1;
       var tokens = lexFromFile('dom.generated.d.ts_de52865', n);
     });
     test('can parse n lines', () {
-      var n = 224; // 57 61 179 183 190 196 224 254 270
+      var n = 1237; // 57 61 179 183 190 196 224 254 270 427 441 1067 1145 1237
       var tree = parseFromFile('dom.generated.d.ts_de52865', n);
     });
     test('can put first n lines through the whole process', () {

@@ -67,3 +67,21 @@ class AmbientVariableDeclaration extends Node {
 
   AmbientVariableDeclaration(this.bindings);
 }
+
+class IndexSignature {
+  var identifier, indexType, typeAnnotation;
+  IndexSignature(this.identifier, this.indexType, this.typeAnnotation);
+}
+
+class FunctionType {
+  var a;
+  var b;
+  FunctionType(this.a, this.b);
+}
+
+class MethodSignature {
+  var name;
+  var nullable;
+  var callSignature;
+  MethodSignature(this.name, this.nullable, this.callSignature);
+}
