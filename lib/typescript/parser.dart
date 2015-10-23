@@ -192,10 +192,7 @@ class Parser {
     List typeBody;
     var t = peek();
     if (t.value != '}') {
-      // safer than try catch
-      //try {
       typeBody = _TypeBody();
-      //} on LookaheadError catch(_) {}
     }
     expect('}');
     return new ObjectType(typeBody);
@@ -268,19 +265,15 @@ class Parser {
       consume();
     }
 
-    // _PropertySignature
-
-    var typeAnnotation = tryParse(_TypeAnnotation);
-    if (typeAnnotation != null) {
-      return new PropertySignature(name, nullable, typeAnnotation);
-    }
-
     // _MethodSignature
-
     var callSignature = tryParse(_CallSignature);
     if (callSignature != null) {
       return new MethodSignature(name, nullable, callSignature);
     }
+
+    // _PropertySignature
+    var typeAnnotation = tryParse(_TypeAnnotation);
+    return new PropertySignature(name, nullable, typeAnnotation);
   }
 
   // ArrayType:

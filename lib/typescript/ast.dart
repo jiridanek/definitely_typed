@@ -22,7 +22,7 @@ class CallSignature {
   CallSignature(this.parameterList, this.typeDeclaration);
 }
 
-class TypeScriptType {
+class TypeScriptType extends Node {
   var type;
   TypeScriptType(this.type);
 }
@@ -31,12 +31,12 @@ class ArrayType extends TypeScriptType {
   ArrayType(type) : super(type);
 }
 
-class ObjectType {
-  var typeBody;
+class ObjectType extends Node {
+  List typeBody;
   ObjectType(this.typeBody);
 }
 
-class InterfaceDeclaration {
+class InterfaceDeclaration extends Node {
   String binding;
   var type;
   InterfaceDeclaration(this.binding, this.type);
@@ -77,10 +77,10 @@ class IndexSignature {
   IndexSignature(this.identifier, this.indexType, this.typeAnnotation);
 }
 
-class FunctionType {
-  var a;
-  var b;
-  FunctionType(this.a, this.b);
+class FunctionType extends Node{
+  var parameterList;
+  var returnType;
+  FunctionType(this.parameterList, this.returnType);
 }
 
 class MethodSignature {

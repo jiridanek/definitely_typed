@@ -182,7 +182,8 @@ main() {
       parseString('interface I {addEventListener(type: "cached");}');
       parseString('interface I { aEL(l: (ev: E) => any);}');
       parseString('interface I {aEL(uC?: boolean);}');
-      parseString('interface I {addEventListener(type: "cached", listener: (ev: Event) => any, useCapture?: boolean): void;}');
+      parseString(
+          'interface I {addEventListener(type: "cached", listener: (ev: Event) => any, useCapture?: boolean): void;}');
 
       parseString('interface ATL {[index: number]: AudioTrack;}');
 
@@ -216,11 +217,45 @@ main() {
 
   group('generate stuff', () {
     test('generate stuff', () {
-      expectGeneratedString('declare var name;', '@Js()external get name;\n');
+      expectGeneratedString('declare var name;', '@JS()external get name;\n');
       expectGeneratedString('declare var name;\ndeclare var status;',
-          '@Js()external get name;\n@Js()external get status;\n');
+          '@JS()external get name;\n@JS()external get status;\n');
       expectGeneratedString(
-          'declare var name: string;', '@Js()external String get name;\n');
+          'declare var name: string;', '@JS()external String get name;\n');
+    });
+    test('interface declaration', () {
+      expectGeneratedString('interface I {}', '@JS()class I{}');
+      expectGeneratedString('interface I {a}',
+          '@JS()class I{external get a;external factory I({a});}');
+
+      expectGeneratedString('interface I {a: string}',
+          '@JS()class I{external String get a;external factory I({String a});}');
+      expectGeneratedString('interface I {a: string[]}',
+          '@JS()class I{external List< String> get a;external factory I({List< String> a});}');
+      expectGeneratedString('interface I {f: () => any}',
+          '@JS()class I{external get f;external factory I({dynamic f()});}');
+
+      //expectGeneratedString('interface A extends B {}', '@JS()class I extends B{}');
+      expectGeneratedString(
+          'interface I {getSegmentsAtEvent: (event: Event) => {}[];}',
+          '@JS()class I{external get getSegmentsAtEvent;external factory I({ List getSegmentsAtEvent(Event event)});}');
+      expectGeneratedString(
+          'interface I {addData: (valuesArray: CircularChartData, index?: number) => void;}',
+          '@JS()class I{external get addData;external factory I({void addData(CircularChartData valuesArray, num  index)});}');
+
+      // broken tests ///
+
+      expectGeneratedString('interface i {segments: Array<CircularChartData>;}',
+          '@JS()class i{external List get segments;external factory i({ List });}');
+      expectGeneratedString('interface I {f()}', '@JS()class I{}');
+      expectGeneratedString(
+          'declare var Chart: {'
+          '    new (context: CanvasRenderingContext2D): Chart;'
+          '    defaults: {'
+          '        global: ChartSettings;'
+          '    }'
+          '};',
+          '@JS()external get Chart;\n');
     });
   });
 
@@ -229,13 +264,20 @@ main() {
       var n = -1;
       var tokens = lexFromFile('dom.generated.d.ts_de52865', n);
     });
-    test('can parse n lines', () {
-      var n = -1; // 57 61 179 183 190 196 224 254 270 427 441 1067 1145 1237 3029 3227 12514 12549 12728
+    skip_test('can parse n lines', () {
+      var n =
+          -1; // 57 61 179 183 190 196 224 254 270 427 441 1067 1145 1237 3029 3227 12514 12549 12728
       var tree = parseFromFile('dom.generated.d.ts_de52865', n);
     });
     test('can put first n lines through the whole process', () {
       var n = 5;
       var code = generateFromFile('dom.generated.d.ts_de52865', n);
+    });
+  });
+  group('from chart.d.ts', () {
+    test('generate', () {
+      var n = -1; // 22 27 77 132 190 200
+      var code = generateFromFile('../lib/chartjs/chart.d.ts_24253c8', n);
     });
   });
 }
