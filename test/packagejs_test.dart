@@ -7,24 +7,24 @@ import "package:js/js.dart";
 import 'dart:js';
 
 
-@Js("JSON.stringify")
+@JS("JSON.stringify")
 external String stringify(var o);
 
-@Js()
+@JS()
 class JSON {
   external static String stringify(var o);
 }
 
 // https://developer.mozilla.org/en-US/docs/Web/API/Blob/Blob
 
-@Js("window.Blob")
+@JS("window.Blob")
 class MapBlob {
   external MapBlob(var o1, var o2);
 
   external get size;
 }
 
-@Js("Blob")
+@JS("Blob")
 class Blob {
   external Blob([List, BlobOptions]);
 
@@ -32,7 +32,7 @@ class Blob {
 }
 
 
-@Js()
+@JS()
 class BlobOptions {
   external String get type;
 

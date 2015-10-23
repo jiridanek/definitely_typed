@@ -2,12 +2,12 @@
 import 'package:js/js.dart';
 import 'package:test/test.dart';
 
-@Js('window.Blob')
+@JS('window.Blob')
 class Blob {
   external Blob([List]);
 }
 
-@Js('window.Blob')
+@JS('window.Blob')
 class RenamedBlob {
   external RenamedBlob([List]);
 }

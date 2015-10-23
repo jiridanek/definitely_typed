@@ -38,7 +38,7 @@ class CodeGeneratingVisitor extends Visitor {
     switch (node.runtimeType) {
       case AmbientVariableDeclaration:
         for (var binding in node.bindings) {
-          w.write('@Js()external');
+          w.write('@JS()external');
           binding.accept(this);
           w.write(';\n');
         }

@@ -1,5 +1,5 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
-// 2015-10-19T22:07:06.591Z
+// 2015-10-23T08:38:48.433Z
 
 part of dts2dart.example.example;
 
@@ -8,5 +8,5 @@ part of dts2dart.example.example;
 // Target: library dts2dart.example.example
 // **************************************************************************
 
-@Js() external String get name;
-@Js() external String get status;
+@JS() external String get name;
+@JS() external String get status;

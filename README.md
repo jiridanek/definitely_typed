@@ -29,7 +29,7 @@ the script `bin/build.dart`
 
 generates `example/dom.g.dart`.
 
-    @Js()
+    @JS()
     external String get name;
 
 Test it with
@@ -78,7 +78,7 @@ Write everything in Dart. Create a vertical slice of the following functionality
 
   - given a JavaScript file and a corresponding .t.ds file
   - parse the .d.ts
-  - turn it into @Js external Dart code
+  - turn it into @JS external Dart code
   - write it out
   - use it to call something in the JavaScript file from Dart
 
