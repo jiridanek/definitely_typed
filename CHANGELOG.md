@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.0.2 (HEAD)
+## 0.0.3 (HEAD)
+
+## 0.0.2
 
 - Lexes the dom.generated.d.ts file without error
 - Parses the dom.generated.d.ts file without error

@@ -25,7 +25,7 @@ and a dart file `example/dom.dart`,
 
 the script `bin/build.dart` 
 
-    $ dart bin/build.dart
+    $ dart bin/build.dart --full
 
 generates `example/dom.g.dart`.
 

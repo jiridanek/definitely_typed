@@ -1,5 +1,5 @@
 name: dts2dart
-version: 0.0.2
+version: 0.0.3
 description:  definitely_typed.dart generates Dart package:js declarations from TypeScript .d.ts declarations
 author: Jirka Daněk <dnk@mail.muni.cz>
 #homepage: https://www.example.com
