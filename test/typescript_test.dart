@@ -164,7 +164,7 @@ main() {
           '<declare <var name>><declare <var status>>');
       expectParsedString(
           'declare var name: string;', '<declare <var name: <type string>>>');
-      //parseString('declare var name: (string);');
+      parseString('declare var name: (string);');
       parseString('declare var name, age;');
 
       parseString('declare var name: string[];');
@@ -204,6 +204,13 @@ main() {
 
       parseString('interface AriaRequestEventInit extends EventInit {}');
       parseString('interface A extends B, C {}');
+      parseString('interface A<B extends C> extends D {}');
+
+      parseString('interface A { declare: string; }');
+
+      parseString('declare type A = B;');
+
+      parseString('declare function f();');
     });
   });
 
@@ -223,7 +230,7 @@ main() {
       var tokens = lexFromFile('dom.generated.d.ts_de52865', n);
     });
     test('can parse n lines', () {
-      var n = 3029; // 57 61 179 183 190 196 224 254 270 427 441 1067 1145 1237 3029
+      var n = -1; // 57 61 179 183 190 196 224 254 270 427 441 1067 1145 1237 3029 3227 12514 12549 12728
       var tree = parseFromFile('dom.generated.d.ts_de52865', n);
     });
     test('can put first n lines through the whole process', () {

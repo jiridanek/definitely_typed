@@ -20,37 +20,37 @@ class Parser {
   // A.1 Types
   //****
 
-//  // TypeParameters:
-//  //   < TypeParameterList >
-//  _TypeParameters() {
-//    lookFor('<');
-//    var typeParameterList = _TypeParameterList();
-//    expect('>');
-//    return typeParameterList;
-//  }
-//
-//  // TypeParameterList:
-//  //   TypeParameter
-//  //   TypeParameterList , TypeParameter
-//  _TypeParameterList() {
-//    return parseListOf(_TypeParameter, ',');
-//  }
-//
-//  // TypeParameter:
-//  //   BindingIdentifier Constraint(opt)
-//  _TypeParameter() {
-//    var bindingIdentifier = _BindingIdentifier();
-//    var constraint = tryParse(_constraint);
-//    return [bindingIdentifier, constraint];
-//  }
-//
-//  // Constraint:
-//  //   extends Type
-//  _Constraint() {
-//    lookFor('extends');
-//    return _Type;
-//  }
-//
+  // TypeParameters:
+  //   < TypeParameterList >
+  _TypeParameters() {
+    lookFor('<');
+    var typeParameterList = _TypeParameterList();
+    expect('>');
+    return typeParameterList;
+  }
+
+  // TypeParameterList:
+  //   TypeParameter
+  //   TypeParameterList , TypeParameter
+  _TypeParameterList() {
+    return parseListOf(_TypeParameter, ',');
+  }
+
+  // TypeParameter:
+  //   BindingIdentifier Constraint(opt)
+  _TypeParameter() {
+    var bindingIdentifier = _BindingIdentifier();
+    var constraint = tryParse(_Constraint);
+    return [bindingIdentifier, constraint];
+  }
+
+  // Constraint:
+  //   extends Type
+  _Constraint() {
+    lookFor('extends');
+    return _Type();
+  }
+
   // TypeArguments:
   //   < TypeArgumentList >
   _TypeArguments() {
@@ -74,12 +74,37 @@ class Parser {
   //   FunctionType
   //   ConstructorType
   _Type() {
-    //FIXME(jirka): it is hard to distinguish parenthesized type and function type
-    var functionType = tryParse(_FunctionType);
-    if (functionType != null) {
-      return functionType;
+    //FIXME(jirka): this is essentially unbounded lookahead for =>
+    //TODO(jirka): it is hard to distinguish parenthesized type and function type
+    var t = peek();
+    if (t.value == '(') {
+      // FIXME: function type does not have to start with (
+      var i;
+      var stack = 1;
+      for (i = 1; stack > 0; i++) {
+        t = lookahead(i);
+        if (t.value == '(') {
+          stack++;
+        } else if (t.value == ')') {
+          stack--;
+        }
+      }
+      t = lookahead(i);
+      if (t.value == '=>') {
+        return _FunctionType();
+      }
     }
+
+//    var functionType = tryParse(_FunctionType);
+//    if (functionType != null) {
+//      return functionType;
+//    }
     return _UnionOrIntersectionOrPrimaryType();
+  }
+
+  //
+  _FunctionOrParenthesizedType() {
+    lookFor('(');
   }
 
   // UnionOrIntersectionOrPrimaryType:
@@ -107,7 +132,8 @@ class Parser {
   //   TypeQuery
   _PrimaryType() {
     var type = expectOneOf([
-      /*_ParenthesizedType, */ _PredefinedType,
+      _ParenthesizedType,
+      _PredefinedType,
       _ObjectType,
       _TypeReference,
       //_TupleType,
@@ -327,7 +353,18 @@ class Parser {
   //   NumericLiteral
   _PropertyName() {
     //TODO(jirka): requires design, these literals might be a problem for Dart
-    return _BindingIdentifier();
+    return expectOneOf([
+      _BindingIdentifier,
+      () {
+        // { e.g. new: { declare:
+        var t = peek();
+        if (t.type == TokenType.KEYWORD) {
+          consume();
+          return t.value;
+        }
+        throw new LookaheadError();
+      }
+    ]);
     //FIXME
   }
 
@@ -451,7 +488,17 @@ class Parser {
     throw ('implemented in higher-up productions');
   }
 
-  // TODO:
+  // TypeAliasDeclaration:
+  //   type BindingIdentifier TypeParameters(opt) = Type ;
+  _TypeAliasDeclaration() {
+    lookFor('type');
+    var bindingIdentifier = _BindingIdentifier();
+    var typeParameters = tryParse(_TypeParameters);
+    expect('=');
+    var type = _Type();
+    expect(';');
+    return;
+  }
 
   //****
   // A.5 Interfaces
@@ -462,6 +509,7 @@ class Parser {
   _InterfaceDeclaration() {
     lookFor('interface');
     var bindingIdentifier = _BindingIdentifier();
+    var typeParameters = tryParse(_TypeParameters);
     var interfaceExtendsClause = tryParse(_InterfaceExtendsClause);
     var objectType = _ObjectType();
     return new InterfaceDeclaration(bindingIdentifier, objectType);
@@ -507,7 +555,10 @@ class Parser {
   //   ImportAliasDeclaration
   //   ExportNamespaceElement
   _NamespaceElement() {
-    return expectOneOf([_InterfaceDeclaration, _AmbientDeclaration]);
+    return expectOneOf([
+      _InterfaceDeclaration,
+      _AmbientDeclaration /*, _TypeAliasDeclaration*/
+    ]);
   }
 
   _BindingIdentifier() {
@@ -534,10 +585,18 @@ class Parser {
       case TokenType.KEYWORD:
         if ([_var, _let, _const].contains(t)) {
           result = _AmbientVariableDeclaration();
+        } else if (t.value == 'function') {
+          result = _AmbientFunctionDeclaration();
+        }
+        break;
+      case TokenType.IDENTIFIER:
+        if (t.value == 'type') {
+          //FIXME: this is not what's in the grammar
+          result = _TypeAliasDeclaration();
         }
         break;
       default:
-        throw ParsingError;
+        throw new ParsingError("${contextForError()}");
     }
     return result;
   }
@@ -571,6 +630,13 @@ class Parser {
 
   // AmbientFunctionDeclaration:
   //   function BindingIdentifier CallSignature ;
+  _AmbientFunctionDeclaration() {
+    lookFor('function');
+    var bindingIdentifier = _BindingIdentifier();
+    var callSignature = _CallSignature();
+    expect(';');
+    return new AmbientFunctionDeclaration(bindingIdentifier, callSignature);
+  }
 
   // TODO
 
@@ -612,7 +678,7 @@ class Parser {
         return f();
       } on LookaheadError catch (_) {}
     }
-    throw ParsingError;
+    throw new ParsingError('${contextForError()}');
   }
 
   //TODO(jirka): consider something for tryParse(() => lookFor())
