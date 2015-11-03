@@ -1,4 +1,4 @@
-import 'package:unittest/unittest.dart';
+import 'package:test/test.dart';
 
 import 'dart:async';
 
@@ -241,12 +241,21 @@ main() {
           '@JS()class I{external get getSegmentsAtEvent;external factory I({ List getSegmentsAtEvent(Event event)});}');
       expectGeneratedString(
           'interface I {addData: (valuesArray: CircularChartData, index?: number) => void;}',
-          '@JS()class I{external get addData;external factory I({void addData(CircularChartData valuesArray, num  index)});}');
+          '@JS()class I{external get addData;external factory I({void addData(CircularChartData valuesArray, num index)});}');
 
-      // broken tests ///
+      // broken tests //
+
+      if (false) expectGeneratedString('interface I {add(value: any): void;}',
+          '@JS()class I{external void add(value)}');
+
+      if (false) expectGeneratedString(
+          'interface I {add(value: any): void;}\ndeclare var I: {new (): I;};',
+          '@JS()class I{external get add(value)}');
+
+      // wrong tests ///
 
       expectGeneratedString('interface i {segments: Array<CircularChartData>;}',
-          '@JS()class i{external List get segments;external factory i({ List });}');
+          '@JS()class i{external List get segments;external factory i({List segments});}');
       expectGeneratedString('interface I {f()}', '@JS()class I{}');
       expectGeneratedString(
           'declare var Chart: {'
@@ -260,24 +269,24 @@ main() {
   });
 
   group('from dom.d.ts', () {
-    skip_test('can lex n lines', () {
+    test('can lex n lines', () {
       var n = -1;
       var tokens = lexFromFile('dom.generated.d.ts_de52865', n);
-    });
-    skip_test('can parse n lines', () {
+    }, skip: 'redundant');
+    test('can parse n lines', () {
       var n =
           -1; // 57 61 179 183 190 196 224 254 270 427 441 1067 1145 1237 3029 3227 12514 12549 12728
-      var tree = parseFromFile('dom.generated.d.ts_de52865', n);
-    });
+      var tree = parseFromFile('test/dom.generated.d.ts_de52865', n);
+    }, skip: 'lengthy');
     test('can put first n lines through the whole process', () {
       var n = 5;
-      var code = generateFromFile('dom.generated.d.ts_de52865', n);
+      var code = generateFromFile('test/dom.generated.d.ts_de52865', n);
     });
   });
   group('from chart.d.ts', () {
     test('generate', () {
       var n = -1; // 22 27 77 132 190 200
-      var code = generateFromFile('../lib/chartjs/chart.d.ts_24253c8', n);
+      var code = generateFromFile('lib/chartjs/chart.d.ts_24253c8', n);
     });
   });
 }

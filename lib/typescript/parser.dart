@@ -180,7 +180,7 @@ class Parser {
   _TypeReference() {
     var typename = _TypeName();
     var typeArguments = tryParse(_TypeArguments);
-    return typename;
+    return new TypeReference(typename, typeArguments);
   }
 
   // TODO:
@@ -438,20 +438,24 @@ class Parser {
       var typeAnnotation = tryParse(_TypeAnnotation);
       return new RequiredParameter(identifier, typeAnnotation);
     }
+
     var identifierOrPattern = _BindingIdentifierOrPattern();
+
     var isOptional = false;
     t = peek();
     if (t.value == '?') {
       consume();
       isOptional = true;
     }
+
+    var typeAnnotation;
     t = lookahead(1);
     if (t.type == TokenType.STRING) {
       expect(':');
-      var stringLiteral = next().value;
-      return new RequiredParameter(identifierOrPattern, stringLiteral);
+      typeAnnotation = next().value;
+    } else {
+      typeAnnotation = tryParse(_TypeAnnotation);
     }
-    var typeAnnotation = tryParse(_TypeAnnotation);
     return new RequiredParameter(identifierOrPattern, typeAnnotation);
   }
 

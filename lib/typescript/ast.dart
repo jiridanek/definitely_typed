@@ -55,6 +55,12 @@ class PredefinedType extends Node {
   PredefinedType(this.type);
 }
 
+class TypeReference extends Node {
+  String typename;
+  var typeArguments;
+  TypeReference(this.typename, this.typeArguments);
+}
+
 class AmbientBinding extends Node {
   var identifier;
   var annotation;
